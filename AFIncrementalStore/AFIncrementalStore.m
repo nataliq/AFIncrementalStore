@@ -624,13 +624,17 @@ withAttributeAndRelationshipValuesFromManagedObject:(NSManagedObject *)managedOb
     if ([self.HTTPClient respondsToSelector:@selector(requestForDeletedObject:)]) {
         for (NSManagedObject *deletedObject in [saveChangesRequest deletedObjects]) {
             NSManagedObjectID *backingObjectID = [self objectIDForBackingObjectForEntity:[deletedObject entity] withResourceIdentifier:AFResourceIdentifierFromReferenceObject([self referenceObjectForObjectID:deletedObject.objectID])];
-
+            if (!backingObjectID) {
+                continue;
+            }
             NSURLRequest *request = [self.HTTPClient requestForDeletedObject:deletedObject];
             if (!request) {
                 [backingContext performBlockAndWait:^{
                     NSManagedObject *backingObject = [backingContext existingObjectWithID:backingObjectID error:nil];
-                    [backingContext deleteObject:backingObject];
-                    [backingContext save:nil];
+                    if (backingObject) {
+                        [backingContext deleteObject:backingObject];
+                        [backingContext save:nil];
+                    }
                 }];
                 continue;
             }
