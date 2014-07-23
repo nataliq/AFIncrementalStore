@@ -81,6 +81,26 @@
 - (NSString *)pathForRelationship:(NSRelationshipDescription *)relationship
                         forObject:(NSManagedObject *)object;
 
+///------------------------
+/// @name Convinience method for creating requests
+///------------------------
+
+/**
+ Uses its requestSerializer to create an `NSMutableURLRequest` object with the specified HTTP method and URL string created from the specified path, relative to the base url of the HTTP client.
+ 
+ If the HTTP method is `GET`, `HEAD`, or `DELETE`, the parameters will be used to construct a url-encoded query string that is appended to the request's URL. Otherwise, the parameters will be encoded according to the value of the `parameterEncoding` property, and set as the request body.
+ 
+ @param method The HTTP method for the request, such as `GET`, `POST`, `PUT`, or `DELETE`. This parameter must not be `nil`.
+ @param path The path to be appended to the HTTP client’s base URL and used as the request URL. If nil, no path will be appended to the base URL.
+ @param parameters The parameters to be either set as a query string for `GET` requests, or the request HTTP body.
+ 
+ @return An `NSMutableURLRequest` object.
+ */
+
+- (NSMutableURLRequest *)requestWithMethod:(NSString *)method
+                                      path:(NSString *)path
+                                parameters:(id)parameters;
+
 @end
 
 ///-----------------

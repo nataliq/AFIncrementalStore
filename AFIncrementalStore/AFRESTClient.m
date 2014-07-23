@@ -24,28 +24,6 @@
 
 #import "TTTDateTransformers.h"
 
-static NSString * AFQueryByAppendingParameters(NSString *query, NSDictionary *parameters) {
-    static NSCharacterSet *_componentSeparatorCharacterSet = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        _componentSeparatorCharacterSet = [NSCharacterSet characterSetWithCharactersInString:@"&"];
-    });
-    
-    if (!parameters || [parameters count] == 0) {
-        return query;
-    }
-    
-    query = query ? [[query stringByTrimmingCharactersInSet:_componentSeparatorCharacterSet] stringByAppendingString:@"&"] : @"";
-    
-    NSMutableArray *mutablePairs = [NSMutableArray arrayWithCapacity:[parameters count]];
-    [parameters enumerateKeysAndObjectsUsingBlock:^(id field, id value, BOOL *stop) {
-        [mutablePairs addObject:[NSString stringWithFormat:@"%@=%@", field, value]];
-    }];
-
-    return [query stringByAppendingString:[mutablePairs componentsJoinedByString:@"&"]];
-}
-
-
 #define URLStringWithBase(u) [[NSURL URLWithString:(u) relativeToURL:self.baseURL] absoluteString]
 
 @interface AFRESTClient ()
@@ -82,6 +60,21 @@ static NSString * AFQueryByAppendingParameters(NSString *query, NSDictionary *pa
                         forObject:(NSManagedObject *)object
 {
     return [[self pathForObject:object] stringByAppendingPathComponent:relationship.name];
+}
+
+- (NSMutableURLRequest *)requestWithMethod:(NSString *)method
+                                      path:(NSString *)path
+                                parameters:(id)parameters
+{
+    NSError *error;
+    NSMutableURLRequest *request = [self.requestSerializer requestWithMethod:method
+                                                                   URLString:URLStringWithBase(path)
+                                                                  parameters:parameters
+                                                                       error:&error];
+    if (error) {
+        NSLog(@"Error: %@", error);
+    }
+    return request;
 }
 
 #pragma mark - AFIncrementalStoreHTTPClient
@@ -199,11 +192,7 @@ static NSString * AFQueryByAppendingParameters(NSString *query, NSDictionary *pa
         [mutableParameters addEntriesFromDictionary:[self.paginator parametersForFetchRequest:fetchRequest]];
     }
     
-    NSMutableURLRequest *mutableRequest = [self.requestSerializer
-                                           requestWithMethod:@"GET"
-                                           URLString:URLStringWithBase([self pathForEntity:fetchRequest.entity])
-                                           parameters:[mutableParameters count] == 0 ? nil : mutableParameters
-                                           error:nil];
+    NSMutableURLRequest *mutableRequest =  [self requestWithMethod:@"GET" path:[self pathForEntity:fetchRequest.entity] parameters:[mutableParameters count] == 0 ? nil : mutableParameters];
     
     return mutableRequest;
 }
@@ -213,9 +202,7 @@ static NSString * AFQueryByAppendingParameters(NSString *query, NSDictionary *pa
                                withContext:(NSManagedObjectContext *)context
 {
     NSManagedObject *object = [context objectWithID:objectID];
-    return [self.requestSerializer requestWithMethod:method URLString:URLStringWithBase([self pathForObject:object])
-                                          parameters:nil
-                                               error:nil];
+    return [self requestWithMethod:method path:[self pathForObject:object] parameters:nil];
 }
 
 - (NSMutableURLRequest *)requestWithMethod:(NSString *)method
@@ -224,9 +211,7 @@ static NSString * AFQueryByAppendingParameters(NSString *query, NSDictionary *pa
                                withContext:(NSManagedObjectContext *)context
 {
     NSManagedObject *object = [context objectWithID:objectID];
-    return [self.requestSerializer requestWithMethod:method URLString:URLStringWithBase([self pathForRelationship:relationship forObject:object])
-                                          parameters:nil
-                                               error:nil];
+    return [self requestWithMethod:method path:[self pathForRelationship:relationship forObject:object] parameters:nil];
 }
 
 - (BOOL)shouldFetchRemoteValuesForRelationship:(NSRelationshipDescription *)relationship
@@ -253,11 +238,7 @@ static NSString * AFQueryByAppendingParameters(NSString *query, NSDictionary *pa
 }
 
 - (NSMutableURLRequest *)requestForInsertedObject:(NSManagedObject *)insertedObject {
-    return [self.requestSerializer
-            requestWithMethod:@"POST"
-            URLString:URLStringWithBase([self pathForEntity:insertedObject.entity])
-            parameters:[self representationOfAttributes:[insertedObject dictionaryWithValuesForKeys:[insertedObject.entity.attributesByName allKeys]] ofManagedObject:insertedObject]
-            error:nil];
+    return [self requestWithMethod:@"POST" path:[self pathForEntity:insertedObject.entity] parameters:[self representationOfAttributes:[insertedObject dictionaryWithValuesForKeys:[insertedObject.entity.attributesByName allKeys]] ofManagedObject:insertedObject]];
 }
 
 - (NSMutableURLRequest *)requestForUpdatedObject:(NSManagedObject *)updatedObject {
@@ -267,19 +248,11 @@ static NSString * AFQueryByAppendingParameters(NSString *query, NSDictionary *pa
         return nil;
     }
     
-    return [self.requestSerializer
-            requestWithMethod:@"PUT"
-            URLString:URLStringWithBase([self pathForObject:updatedObject])
-            parameters:[self representationOfAttributes:[[updatedObject changedValues] dictionaryWithValuesForKeys:[mutableChangedAttributeKeys allObjects]] ofManagedObject:updatedObject]
-            error:nil];
+    return [self requestWithMethod:@"PUT" path:[self pathForObject:updatedObject] parameters:[self representationOfAttributes:[[updatedObject changedValues] dictionaryWithValuesForKeys:[mutableChangedAttributeKeys allObjects]] ofManagedObject:updatedObject]];
 }
 
 - (NSMutableURLRequest *)requestForDeletedObject:(NSManagedObject *)deletedObject {
-    return [self.requestSerializer
-            requestWithMethod:@"DELETE"
-            URLString:URLStringWithBase([self pathForObject:deletedObject])
-            parameters:nil
-            error:nil];
+    return [self requestWithMethod:@"DELETE" path:[self pathForObject:deletedObject] parameters:nil];
 }
 
 @end
