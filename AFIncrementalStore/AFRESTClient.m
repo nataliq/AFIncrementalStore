@@ -45,6 +45,9 @@ static NSString * AFQueryByAppendingParameters(NSString *query, NSDictionary *pa
     return [query stringByAppendingString:[mutablePairs componentsJoinedByString:@"&"]];
 }
 
+
+#define URLStringWithBase(u) [[NSURL URLWithString:(u) relativeToURL:self.baseURL] absoluteString]
+
 @interface AFRESTClient ()
 @property (readwrite, nonatomic, strong) TTTStringInflector *inflector;
 @end
@@ -196,7 +199,11 @@ static NSString * AFQueryByAppendingParameters(NSString *query, NSDictionary *pa
         [mutableParameters addEntriesFromDictionary:[self.paginator parametersForFetchRequest:fetchRequest]];
     }
     
-    NSMutableURLRequest *mutableRequest =  [self requestWithMethod:@"GET" path:[self pathForEntity:fetchRequest.entity] parameters:[mutableParameters count] == 0 ? nil : mutableParameters];
+    NSMutableURLRequest *mutableRequest = [self.requestSerializer
+                                           requestWithMethod:@"GET"
+                                           URLString:URLStringWithBase([self pathForEntity:fetchRequest.entity])
+                                           parameters:[mutableParameters count] == 0 ? nil : mutableParameters
+                                           error:nil];
     
     return mutableRequest;
 }
@@ -206,7 +213,9 @@ static NSString * AFQueryByAppendingParameters(NSString *query, NSDictionary *pa
                                withContext:(NSManagedObjectContext *)context
 {
     NSManagedObject *object = [context objectWithID:objectID];
-    return [self requestWithMethod:method path:[self pathForObject:object] parameters:nil];
+    return [self.requestSerializer requestWithMethod:method URLString:URLStringWithBase([self pathForObject:object])
+                                          parameters:nil
+                                               error:nil];
 }
 
 - (NSMutableURLRequest *)requestWithMethod:(NSString *)method
@@ -215,7 +224,9 @@ static NSString * AFQueryByAppendingParameters(NSString *query, NSDictionary *pa
                                withContext:(NSManagedObjectContext *)context
 {
     NSManagedObject *object = [context objectWithID:objectID];
-    return [self requestWithMethod:method path:[self pathForRelationship:relationship forObject:object] parameters:nil];
+    return [self.requestSerializer requestWithMethod:method URLString:URLStringWithBase([self pathForRelationship:relationship forObject:object])
+                                          parameters:nil
+                                               error:nil];
 }
 
 - (BOOL)shouldFetchRemoteValuesForRelationship:(NSRelationshipDescription *)relationship
@@ -242,7 +253,11 @@ static NSString * AFQueryByAppendingParameters(NSString *query, NSDictionary *pa
 }
 
 - (NSMutableURLRequest *)requestForInsertedObject:(NSManagedObject *)insertedObject {
-    return [self requestWithMethod:@"POST" path:[self pathForEntity:insertedObject.entity] parameters:[self representationOfAttributes:[insertedObject dictionaryWithValuesForKeys:[insertedObject.entity.attributesByName allKeys]] ofManagedObject:insertedObject]];
+    return [self.requestSerializer
+            requestWithMethod:@"POST"
+            URLString:URLStringWithBase([self pathForEntity:insertedObject.entity])
+            parameters:[self representationOfAttributes:[insertedObject dictionaryWithValuesForKeys:[insertedObject.entity.attributesByName allKeys]] ofManagedObject:insertedObject]
+            error:nil];
 }
 
 - (NSMutableURLRequest *)requestForUpdatedObject:(NSManagedObject *)updatedObject {
@@ -252,11 +267,19 @@ static NSString * AFQueryByAppendingParameters(NSString *query, NSDictionary *pa
         return nil;
     }
     
-    return [self requestWithMethod:@"PUT" path:[self pathForObject:updatedObject] parameters:[self representationOfAttributes:[[updatedObject changedValues] dictionaryWithValuesForKeys:[mutableChangedAttributeKeys allObjects]] ofManagedObject:updatedObject]];
+    return [self.requestSerializer
+            requestWithMethod:@"PUT"
+            URLString:URLStringWithBase([self pathForObject:updatedObject])
+            parameters:[self representationOfAttributes:[[updatedObject changedValues] dictionaryWithValuesForKeys:[mutableChangedAttributeKeys allObjects]] ofManagedObject:updatedObject]
+            error:nil];
 }
 
 - (NSMutableURLRequest *)requestForDeletedObject:(NSManagedObject *)deletedObject {
-    return [self requestWithMethod:@"DELETE" path:[self pathForObject:deletedObject] parameters:nil];
+    return [self.requestSerializer
+            requestWithMethod:@"DELETE"
+            URLString:URLStringWithBase([self pathForObject:deletedObject])
+            parameters:nil
+            error:nil];
 }
 
 @end

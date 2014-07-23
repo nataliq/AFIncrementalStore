@@ -21,8 +21,10 @@
 // THE SOFTWARE.
 
 #import "AFIncrementalStore.h"
-#import "AFHTTPClient.h"
+
 #import <objc/runtime.h>
+#import <AFNetworking/AFHTTPRequestOperationManager.h>
+
 
 NSString * const AFIncrementalStoreUnimplementedMethodException = @"com.alamofire.incremental-store.exceptions.unimplemented-method";
 
@@ -449,7 +451,7 @@ withAttributeAndRelationshipValuesFromManagedObject:(NSManagedObject *)managedOb
         }];
 
         [self notifyManagedObjectContext:context aboutRequestOperation:operation forFetchRequest:fetchRequest fetchedObjectIDs:nil];
-        [self.HTTPClient enqueueHTTPRequestOperation:operation];
+        [operation start];
     }
     
     NSManagedObjectContext *backingContext = [self backingManagedObjectContext];
@@ -496,6 +498,7 @@ withAttributeAndRelationshipValuesFromManagedObject:(NSManagedObject *)managedOb
                     withContext:(NSManagedObjectContext *)context
                           error:(NSError *__autoreleasing *)error
 {
+    dispatch_group_t group = dispatch_group_create();
     NSMutableArray *mutableOperations = [NSMutableArray array];
     NSManagedObjectContext *backingContext = [self backingManagedObjectContext];
 
@@ -582,6 +585,7 @@ withAttributeAndRelationshipValuesFromManagedObject:(NSManagedObject *)managedOb
 					}
 				}
             }];
+            operation.completionGroup = group;
             
             [mutableOperations addObject:operation];
         }
@@ -619,6 +623,7 @@ withAttributeAndRelationshipValuesFromManagedObject:(NSManagedObject *)managedOb
                 NSLog(@"Update Error: %@", error);
                 [context refreshObject:updatedObject mergeChanges:NO];
             }];
+            operation.completionGroup = group;
             
             [mutableOperations addObject:operation];
         }
@@ -651,6 +656,7 @@ withAttributeAndRelationshipValuesFromManagedObject:(NSManagedObject *)managedOb
             } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
                 NSLog(@"Delete Error: %@", error);
             }];
+            operation.completionGroup = group;
             
             [mutableOperations addObject:operation];
         }
@@ -660,10 +666,12 @@ withAttributeAndRelationshipValuesFromManagedObject:(NSManagedObject *)managedOb
     NSSaveChangesRequest *saveChangesRequestCopy = [[NSSaveChangesRequest alloc] initWithInsertedObjects:[saveChangesRequest.insertedObjects copy] updatedObjects:[saveChangesRequest.updatedObjects copy] deletedObjects:[saveChangesRequest.deletedObjects copy] lockedObjects:[saveChangesRequest.lockedObjects copy]];
     
     [self notifyManagedObjectContext:context aboutRequestOperations:mutableOperations forSaveChangesRequest:saveChangesRequestCopy];
-
-    [self.HTTPClient enqueueBatchOfHTTPRequestOperations:mutableOperations progressBlock:nil completionBlock:^(NSArray *operations) {
-        [self notifyManagedObjectContext:context aboutRequestOperations:operations forSaveChangesRequest:saveChangesRequestCopy];
-    }];
+    
+    dispatch_group_notify(group, dispatch_get_main_queue(), ^{
+        [self notifyManagedObjectContext:context aboutRequestOperations:[NSArray arrayWithArray:mutableOperations]
+                   forSaveChangesRequest:saveChangesRequestCopy];
+    });
+    [mutableOperations makeObjectsPerformSelector:@selector(start)];
     
     return [NSArray array];
 }
@@ -735,7 +743,7 @@ withAttributeAndRelationshipValuesFromManagedObject:(NSManagedObject *)managedOb
         NSMutableDictionary *mutableUserInfo = [NSMutableDictionary dictionary];
         [mutableUserInfo setValue:[NSString stringWithFormat:NSLocalizedString(@"Unsupported NSFetchRequestResultType, %d", nil), persistentStoreRequest.requestType] forKey:NSLocalizedDescriptionKey];
         if (error) {
-            *error = [[NSError alloc] initWithDomain:AFNetworkingErrorDomain code:0 userInfo:mutableUserInfo];
+            *error = [[NSError alloc] initWithDomain:AFURLRequestSerializationErrorDomain code:0 userInfo:mutableUserInfo];
         }
         
         return nil;
@@ -819,7 +827,7 @@ withAttributeAndRelationshipValuesFromManagedObject:(NSManagedObject *)managedOb
                 }];
 
                 [self notifyManagedObjectContext:context aboutRequestOperation:operation forNewValuesForObjectWithID:objectID];
-                [self.HTTPClient enqueueHTTPRequestOperation:operation];
+                [operation start];
             }
         }
     }
@@ -881,7 +889,7 @@ withAttributeAndRelationshipValuesFromManagedObject:(NSManagedObject *)managedOb
             }];
 			
 			[self notifyManagedObjectContext:context aboutRequestOperation:operation forNewValuesForRelationship:relationship forObjectWithID:objectID];
-            [self.HTTPClient enqueueHTTPRequestOperation:operation];
+            [operation start];
         }
     }
     
