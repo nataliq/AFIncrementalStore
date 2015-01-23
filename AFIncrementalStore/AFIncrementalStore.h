@@ -277,6 +277,17 @@
                                forObjectWithID:(NSManagedObjectID *)objectID
                         inManagedObjectContext:(NSManagedObjectContext *)context;
 
+/**
+ *  Can be used for computations on the response object for authentication. If the response could not be authenticated, it won't be parsed and saved.
+ *
+ *  @param request   The URL request which has been made.
+ *  @param responseObject The response object returned from the server.
+ *
+ *  @return `YES` if the HTTP request was authenticated successfuly from the response object, `NO.
+ */
+- (BOOL)authenticateRequest:(NSURLRequest *)request
+              fromResponseObject:(id)responseObject;
+
 @end
 
 ///----------------

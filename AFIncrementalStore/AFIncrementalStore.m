@@ -418,32 +418,41 @@ withAttributeAndRelationshipValuesFromManagedObject:(NSManagedObject *)managedOb
     if ([request URL]) {
         AFHTTPRequestOperation *operation = [self.HTTPClient HTTPRequestOperationWithRequest:request success:^(AFHTTPRequestOperation *operation, id responseObject) {
             [context performBlockAndWait:^{
-                id representationOrArrayOfRepresentations = [self.HTTPClient representationOrArrayOfRepresentationsOfEntity:fetchRequest.entity fromResponseObject:responseObject];
-        
-                NSManagedObjectContext *childContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
-                childContext.parentContext = context;
-                childContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy;
-
-                [childContext performBlockAndWait:^{
-                    [self insertOrUpdateObjectsFromRepresentations:representationOrArrayOfRepresentations ofEntity:fetchRequest.entity fromResponse:operation.response withContext:childContext error:nil completionBlock:^(NSArray *managedObjects, NSArray *backingObjects) {
-                        NSSet *childObjects = [childContext registeredObjects];
-                        AFSaveManagedObjectContextOrThrowInternalConsistencyException(childContext);
-
-                        NSManagedObjectContext *backingContext = [self backingManagedObjectContext];
-                        [backingContext performBlockAndWait:^{
-                            AFSaveManagedObjectContextOrThrowInternalConsistencyException(backingContext);
+                BOOL isAuthenticated = YES;
+                if ([self.HTTPClient respondsToSelector:@selector(authenticateRequest:fromResponseObject:)]) {
+                    isAuthenticated = [self.HTTPClient authenticateRequest:request fromResponseObject:responseObject];
+                }
+                if (isAuthenticated) {
+                    id representationOrArrayOfRepresentations = [self.HTTPClient representationOrArrayOfRepresentationsOfEntity:fetchRequest.entity fromResponseObject:responseObject];
+                    
+                    NSManagedObjectContext *childContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
+                    childContext.parentContext = context;
+                    childContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy;
+                    
+                    [childContext performBlockAndWait:^{
+                        [self insertOrUpdateObjectsFromRepresentations:representationOrArrayOfRepresentations ofEntity:fetchRequest.entity fromResponse:operation.response withContext:childContext error:nil completionBlock:^(NSArray *managedObjects, NSArray *backingObjects) {
+                            NSSet *childObjects = [childContext registeredObjects];
+                            AFSaveManagedObjectContextOrThrowInternalConsistencyException(childContext);
+                            
+                            NSManagedObjectContext *backingContext = [self backingManagedObjectContext];
+                            [backingContext performBlockAndWait:^{
+                                AFSaveManagedObjectContextOrThrowInternalConsistencyException(backingContext);
+                            }];
+                            
+                            [context performBlockAndWait:^{
+                                for (NSManagedObject *childObject in childObjects) {
+                                    NSManagedObject *parentObject = [context objectWithID:childObject.objectID];
+                                    [context refreshObject:parentObject mergeChanges:NO];
+                                }
+                            }];
+                            
+                            [self notifyManagedObjectContext:context aboutRequestOperation:operation forFetchRequest:fetchRequest fetchedObjectIDs:[managedObjects valueForKeyPath:@"objectID"]];
                         }];
-
-                        [context performBlockAndWait:^{
-                            for (NSManagedObject *childObject in childObjects) {
-                                NSManagedObject *parentObject = [context objectWithID:childObject.objectID];
-                                [context refreshObject:parentObject mergeChanges:NO];
-                            }
-                        }];
-
-                        [self notifyManagedObjectContext:context aboutRequestOperation:operation forFetchRequest:fetchRequest fetchedObjectIDs:[managedObjects valueForKeyPath:@"objectID"]];
                     }];
-                }];
+                }
+                else {
+                    NSLog(@"Authentication failed!");
+                }
             }];
         } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
             NSLog(@"Error: %@", error);
