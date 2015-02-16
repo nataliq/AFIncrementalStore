@@ -615,18 +615,28 @@ withAttributeAndRelationshipValuesFromManagedObject:(NSManagedObject *)managedOb
             }
             
             AFHTTPRequestOperation *operation = [self.HTTPClient HTTPRequestOperationWithRequest:request success:^(AFHTTPRequestOperation *operation, id responseObject) {
+                BOOL isAuthenticated = YES;
+                if ([self.HTTPClient respondsToSelector:@selector(authenticateRequest:fromResponseObject:)]) {
+                    isAuthenticated = [self.HTTPClient authenticateRequest:request fromResponseObject:responseObject];
+                }
+                if (isAuthenticated) {
                 id representationOrArrayOfRepresentations = [self.HTTPClient representationOrArrayOfRepresentationsOfEntity:[updatedObject entity]  fromResponseObject:responseObject];
-                if ([representationOrArrayOfRepresentations isKindOfClass:[NSDictionary class]]) {
-                    NSDictionary *representation = (NSDictionary *)representationOrArrayOfRepresentations;
-                    [updatedObject setValuesForKeysWithDictionary:[self.HTTPClient attributesForRepresentation:representation ofEntity:updatedObject.entity fromResponse:operation.response]];
+                    if ([representationOrArrayOfRepresentations isKindOfClass:[NSDictionary class]]) {
+                        NSDictionary *representation = (NSDictionary *)representationOrArrayOfRepresentations;
+                        [updatedObject setValuesForKeysWithDictionary:[self.HTTPClient attributesForRepresentation:representation ofEntity:updatedObject.entity fromResponse:operation.response]];
 
-                    [backingContext performBlockAndWait:^{
-                        NSManagedObject *backingObject = [backingContext existingObjectWithID:backingObjectID error:nil];
-                        [self updateBackingObject:backingObject withAttributeAndRelationshipValuesFromManagedObject:updatedObject];
-                        [backingContext save:nil];
-                    }];
+                        [backingContext performBlockAndWait:^{
+                            NSManagedObject *backingObject = [backingContext existingObjectWithID:backingObjectID error:nil];
+                            [self updateBackingObject:backingObject withAttributeAndRelationshipValuesFromManagedObject:updatedObject];
+                            [backingContext save:nil];
+                        }];
 
-                    [context refreshObject:updatedObject mergeChanges:YES];
+                        [context refreshObject:updatedObject mergeChanges:YES];
+                    }
+                }
+                else {
+                    NSLog(@"Update Error: authentication failed");
+                    [context refreshObject:updatedObject mergeChanges:NO];
                 }
             } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
                 NSLog(@"Update Error: %@", error);
