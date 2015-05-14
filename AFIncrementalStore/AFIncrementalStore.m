@@ -507,6 +507,7 @@ withAttributeAndRelationshipValuesFromManagedObject:(NSManagedObject *)managedOb
                     withContext:(NSManagedObjectContext *)context
                           error:(NSError *__autoreleasing *)error
 {
+    
     dispatch_group_t group = dispatch_group_create();
     NSMutableArray *mutableOperations = [NSMutableArray array];
     NSManagedObjectContext *backingContext = [self backingManagedObjectContext];
@@ -676,7 +677,7 @@ withAttributeAndRelationshipValuesFromManagedObject:(NSManagedObject *)managedOb
     NSManagedObjectID *backingObjectID = [self objectIDForBackingObjectForEntity:[updatedObject entity] withResourceIdentifier:AFResourceIdentifierFromReferenceObject([self referenceObjectForObjectID:updatedObject.objectID])];
     
     AFHTTPRequestOperation *operation = [self.HTTPClient HTTPRequestOperationWithRequest:request success:^(AFHTTPRequestOperation *operation, id responseObject) {
-        BOOL shouldRetry = [self.HTTPClient shouldRetryRequest:request forUpdatedObject:updatedObject];
+        BOOL shouldRetry = [updatedObject.entity.name isEqualToString:@"SurveyQuestion"] && [self.HTTPClient shouldRetryRequest:request forUpdatedObject:updatedObject];
         
         BOOL isAuthenticated = YES;
         if ([self.HTTPClient respondsToSelector:@selector(authenticateRequest:fromResponseObject:)]) {
@@ -709,7 +710,7 @@ withAttributeAndRelationshipValuesFromManagedObject:(NSManagedObject *)managedOb
             NSLog(@"Update Error: authentication failed");
         }
     } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
-        BOOL shouldRetry = [self.HTTPClient shouldRetryRequest:request forUpdatedObject:updatedObject];
+        BOOL shouldRetry = [updatedObject.entity.name isEqualToString:@"SurveyQuestion"] && [self.HTTPClient shouldRetryRequest:request forUpdatedObject:updatedObject];
         NSLog(@"Update Error: %@", error);
         if (shouldRetry) {
             [self.HTTPClient updateRetryMetadataForRequest:request forUpdateObject:updatedObject];
