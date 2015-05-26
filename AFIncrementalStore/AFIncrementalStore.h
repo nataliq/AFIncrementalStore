@@ -288,6 +288,10 @@
 - (BOOL)authenticateRequest:(NSURLRequest *)request
               fromResponseObject:(id)responseObject;
 
+- (BOOL)shouldRetryRequest:(NSURLRequest *)request forUpdatedObject:(NSManagedObject *)updatedObject;
+
+- (void)updateRetryMetadataForRequest:(NSURLRequest *)request forUpdateObject:(NSManagedObject *)updatedObject;
+
 @end
 
 ///----------------
