@@ -1,17 +1,17 @@
 // AFIncrementalStore.h
 //
 // Copyright (c) 2012 Mattt Thompson (http://mattt.me)
-// 
+//
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
 // in the Software without restriction, including without limitation the rights
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be included in
 // all copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -33,17 +33,17 @@
  ### Methods to Override
  
  In a subclass of `AFIncrementalStore`, you _must_ override the following methods to provide behavior appropriate for your store:
-    
-    - `+type`
-    - `+model`
+ 
+ - `+type`
+ - `+model`
  
  Additionally, all `NSPersistentStore` subclasses, and thus all `AFIncrementalStore` subclasses must do `NSPersistentStoreCoordinator +registerStoreClass:forStoreType:` in order to be created by `NSPersistentStoreCoordinator -addPersistentStoreWithType:configuration:URL:options:error:`. It is recommended that subclasses register themselves in their own `+initialize` method.
  
  Optionally, `AFIncrementalStore` subclasses can override the following methods:
  
-    - `-executeFetchRequest:withContext:error:`
-    - `-executeSaveChangesRequest:withContext:error:`
-
+ - `-executeFetchRequest:withContext:error:`
+ - `-executeSaveChangesRequest:withContext:error:`
+ 
  ### Methods Not To Be Overridden
  
  Subclasses should not override `-executeRequest:withContext:error`. Instead, override `-executeFetchRequest:withContext:error:` or `-executeSaveChangesRequest:withContext:error:`, which are called by `-executeRequest:withContext:error` depending on the type of persistent store request.
@@ -119,7 +119,7 @@
  Returns an `NSDictionary` or an `NSArray` of `NSDictionaries` containing the representations of the resources found in a response object.
  
  @discussion For example, if `GET /users` returned an `NSDictionary` with an array of users keyed on `"users"`, this method would return the keyed array. Conversely, if `GET /users/123` returned a dictionary with all of the atributes of the requested user, this method would simply return that dictionary.
-
+ 
  @param entity The entity represented
  @param responseObject The response object returned from the server.
  
@@ -167,7 +167,7 @@
  @param entity The entity for the representation.
  @param response The HTTP response for the resource request.
  
- @return An `NSDictionary` containing the attributes for a managed object. 
+ @return An `NSDictionary` containing the attributes for a managed object.
  */
 - (NSDictionary *)attributesForRepresentation:(NSDictionary *)representation
                                      ofEntity:(NSEntityDescription *)entity
@@ -207,12 +207,12 @@
  @discussion For example, if a `Department` managed object was attempting to fulfill a fault on the `employees` relationship, this method might return `GET /departments/sales/employees`.
  
  @param method The HTTP method of the request.
- @param relationship The relationship of the specifified managed object 
+ @param relationship The relationship of the specifified managed object
  @param objectID The object ID for the specified managed object.
  @param context The managed object context for the managed object.
  
  @return An `NSURLRequest` object with the provided HTTP method for the resource or resoures corresponding to the relationship of the managed object.
-
+ 
  */
 - (NSMutableURLRequest *)requestWithMethod:(NSString *)method
                        pathForRelationship:(NSRelationshipDescription *)relationship
@@ -233,7 +233,7 @@
  @param attributes The resource representation.
  @param managedObject The `NSManagedObject` for the representation.
  
- @return An `NSDictionary` containing the attributes for a representation, based on the given managed object. 
+ @return An `NSDictionary` containing the attributes for a representation, based on the given managed object.
  */
 - (NSDictionary *)representationOfAttributes:(NSDictionary *)attributes
                              ofManagedObject:(NSManagedObject *)managedObject;
@@ -286,7 +286,11 @@
  *  @return `YES` if the HTTP request was authenticated successfuly from the response object, `NO.
  */
 - (BOOL)authenticateRequest:(NSURLRequest *)request
-              fromResponseObject:(id)responseObject;
+         fromResponseObject:(id)responseObject;
+
+- (BOOL)shouldRetryRequest:(NSURLRequest *)request forUpdatedObject:(NSManagedObject *)updatedObject;
+
+- (void)updateRetryMetadataForRequest:(NSURLRequest *)request forUpdateObject:(NSManagedObject *)updatedObject;
 
 @end
 
@@ -294,11 +298,11 @@
 /// @name Functions
 ///----------------
 
-/** 
+/**
  There is a bug in Core Data wherein managed object IDs whose reference object is a string beginning with a digit will incorrectly strip any subsequent non-numeric characters from the reference object. This breaks any functionality related to URI representations of the managed object ID, and likely other methods as well. For example, an object ID with a reference object of @"123ABC" would generate one with a URI represenation `coredata://store-UUID/Entity/123`, rather than the expected `coredata://store-UUID/Entity/123ABC`. As a fix, rather than resource identifiers being used directly as reference objects, they are prepended with a non-numeric constant first.
  
  Thus, in order to get the resource identifier of a managed object's reference object, you must use the function `AFResourceIdentifierFromReferenceObject()`.
-    
+ 
  See https://github.com/AFNetworking/AFIncrementalStore/issues/82 for more details.
  */
 extern NSString * AFReferenceObjectFromResourceIdentifier(NSString *resourceIdentifier);
@@ -319,7 +323,7 @@ extern NSString * const AFIncrementalStoreUnimplementedMethodException;
 ///--------------------
 
 /**
- Posted before an HTTP request operation corresponding to a fetch request starts. 
+ Posted before an HTTP request operation corresponding to a fetch request starts.
  The object is the managed object context of the request.
  The notification `userInfo` contains the finished request operation, keyed at `AFIncrementalStoreRequestOperationKey`, as well as the associated persistent store request, if applicable, keyed at `AFIncrementalStorePersistentStoreRequestKey`.
  */
@@ -370,7 +374,7 @@ extern NSString * const AFIncrementalStoreContextDidFetchNewValuesForObject;
  Posted before an HTTP request operation corresponding to an relationship fault starts.
  The object is the managed object context of the request.
  The notification `userInfo` contains an array of request operations, keyed at `AFIncrementalStoreRequestOperationKey`, as well as the faulting relationship, keyed at `AFIncrementalStoreFaultingRelationshipKey`, and the managed object ID of the faulting object, keyed at `AFIncrementalStoreFaultingObjectIDKey`.
-
+ 
  */
 extern NSString * const AFIncrementalStoreContextWillFetchNewValuesForRelationship;
 
@@ -381,11 +385,14 @@ extern NSString * const AFIncrementalStoreContextWillFetchNewValuesForRelationsh
  */
 extern NSString * const AFIncrementalStoreContextDidFetchNewValuesForRelationship;
 
+extern NSString * const AFIncrementalStoreContextDidUpdateObject;
+
+
 //------------------------------------------------------------------------------
 
 /**
  A key in the `userInfo` dictionary in a `AFIncrementalStoreContextWillFetchRemoteValues` or `AFIncrementalStoreContextDidFetchRemoteValues` as well as `AFIncrementalStoreContextWillSaveRemoteValues` or `AFIncrementalStoreContextDidSaveRemoteValues` notifications.
- The corresponding value is an `NSArray` of `AFHTTPRequestOperation` objects corresponding to the request operations triggered by the fetch or save changes request. 
+ The corresponding value is an `NSArray` of `AFHTTPRequestOperation` objects corresponding to the request operations triggered by the fetch or save changes request.
  */
 extern NSString * const AFIncrementalStoreRequestOperationsKey;
 
